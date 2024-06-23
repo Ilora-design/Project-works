@@ -1,0 +1,133 @@
+-- To find the airlines ranking based on the number of flights(Code 1):
+/* 
+    Groupig based on the airline 
+    and ordering in descending order of number of flights
+ */
+SELECT
+  marketing_airline_network,
+  COUNT(*) AS no_of_flights
+FROM
+  test_db.athena_sample_exercise_12
+GROUP BY
+  marketing_airline_network 
+ORDER BY no_of_flights DESC ; 
+
+
+-- Trend on number of flights (Code 2):
+/* 
+    Grouping based on airline network and day of the month
+    and then ordering by the day of the month and total flights
+    in descending ordering
+*/
+SELECT
+  marketing_airline_network AS airline,
+  dayofmonth,
+  COUNT(*) AS total_flights
+FROM
+  test_db.athena_sample_exercise_12
+GROUP BY
+  marketing_airline_network,
+  dayofmonth
+ORDER BY
+  dayofmonth DESC, total_flights DESC;
+  
+
+-- To find delays (Code 3):
+/*
+    Finding delays based on day of the week
+    and duration of delay in arrival and departure
+    and divarrdelay (Difference in minutes between scheduled and actual arrival time for a diverted flight reaching scheduled destination.)
+    Value is positive means there is delay by that number of minutes.
+*/
+  SELECT dayofweek, depdel15, arrdel15
+  FROM test_db.athena_sample_exercise_12
+  WHERE divarrdelay=1 OR arrdel15 > 0 OR depdel15>0;
+  
+
+-- Flight age and delay (Code 4):
+/*
+    Calculating the age of the flight by the number of flights
+    taken and have not arrived on time.
+*/
+SELECT flights,
+    COUNT(*) AS no_of_flights, 
+    SUM(depdel15) AS Total_departure_delay, 
+    SUM(arrdel15) AS Total_arrival_delay
+FROM test_db.athena_sample_exercise_12
+WHERE (depdel15 IS NOT NULL OR arrdel15 IS NOT NULL)
+GROUP BY flights
+ORDER BY no_of_flights DESC;
+
+-- Number of flights with location (dayofweek) (Code 5):
+/*
+    Calculating using CTE flights leaving and flights arriving
+    and ordering by the airport name (location) and day of the week.
+*/
+WITH flights_leaving AS (
+    SELECT origin AS location_name, dayofweek, count(*) AS flights_left
+    FROM test_db.athena_sample_exercise_12
+    GROUP BY origin, dayofweek
+), 
+flights_arriving AS (
+    SELECT destcityname AS location_name, dayofweek, count(*) AS flights_arrived
+    FROM test_db.athena_sample_exercise_12
+    GROUP BY destcityname, dayofweek
+)
+SELECT fl.location_name, fl.dayofweek, fl.flights_left, fa.flights_arrived
+FROM flights_leaving fl
+FULL JOIN flights_arriving fa
+ON fl.location_name = fa.location_name AND fl.dayofweek = fa.dayofweek
+ORDER BY fl.location_name, fl.dayofweek;
+
+
+-- Number of flights with location (dayofmonth) (Code 6):
+/*
+    Calculating using CTE flights leaving and flights arriving
+    and ordering by the airport name (location) and day of the month.
+*/
+WITH flights_leaving AS (
+    SELECT origin AS location_name, dayofmonth, count(*) AS flights_left
+    FROM test_db.athena_sample_exercise_12
+    GROUP BY origin, dayofmonth
+), 
+flights_arriving AS (
+    SELECT destcityname AS location_name, dayofmonth, count(*) AS flights_arrived
+    FROM test_db.athena_sample_exercise_12
+    GROUP BY destcityname, dayofmonth
+)
+SELECT fl.location_name, fl.dayofmonth, fl.flights_left, fa.flights_arrived
+FROM flights_leaving fl
+FULL JOIN flights_arriving fa
+ON fl.location_name = fa.location_name AND fl.dayofmonth = fa.dayofmonth
+ORDER BY fl.location_name, fl.dayofmonth;
+
+-- Percentage of flights delayed by weather per airport (Code 7):
+/*
+    Calculating using CTE flights delayed and total number of flights 
+    based on location.
+*/
+WITH flights_delayed AS (
+    SELECT
+      origin,
+      COUNT(*) AS num_flights_delayed_by_weather
+    FROM test_db.athena_sample_exercise_12
+    WHERE weatherdelay >= 10.0
+    GROUP BY origin
+),
+flights_total AS (
+    SELECT
+      origin,
+      COUNT(*) AS num_flights
+    FROM test_db.athena_sample_exercise_12
+    GROUP BY origin
+)
+SELECT
+  ft.origin AS airport_name,
+  fd.num_flights_delayed_by_weather AS num_flights_delayed,
+  ft.num_flights AS total_flights,
+  (fd.num_flights_delayed_by_weather*100)/ ft.num_flights AS percentage_delayed
+FROM flights_total ft
+JOIN flights_delayed fd
+ON ft.origin = fd.origin
+ORDER BY airport_name;
+
